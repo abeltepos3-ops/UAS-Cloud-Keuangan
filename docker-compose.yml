@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # 1. Container Aplikasi Backend
+  app:
+    build: .
+    container_name: keuangan_app
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+    depends_on:
+      db:
+        condition: service_healthy # Aplikasi baru menyala jika DB sudah siap
+    networks:
+      - keuangan_network
+
+  # 2. Container Database MySQL
+  db:
+    image: mysql:8.0
+    container_name: keuangan_db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      # Persistent Volume agar data tidak hilang (Syarat Wajib UAS)
+      - db_keuangan_data:/var/lib/mysql
+      # Mengeksekusi file init.sql saat database pertama kali dibuat
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      retries: 5
+    networks:
+      - keuangan_network
+
+  # 3. Container Alat Bantu Database (Nilai Tambah)
+  adminer:
+    image: adminer:latest
+    container_name: keuangan_adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    networks:
+      - keuangan_network
+
+# Mendefinisikan jaringan agar ketiga container bisa saling mengobrol
+networks:
+  keuangan_network:
+    driver: bridge
+
+# Mendefinisikan persistent volume
+volumes:
+  db_keuangan_data:
